@@ -10,12 +10,9 @@ Links every claim transaction to the Arc block explorer
 Auto-switches wallet to Arc Testnet if needed
 Smart Contracts
 FLUX Token
-ERC-20 token deployed on Arc Testnet.
 Code
 FLUX Faucet
-Holds tokens and drips 100 FLUX per claim with an 8-hour cooldown.
 Code
-Solidity
 Network Details
 Parameter
 Value
@@ -31,11 +28,11 @@ Explorer
 testnet.arcscan.app
 Run Locally
 Bash
-Open via a local server or deploy to GitHub Pages — wallet connections require HTTPS and won't work from a local file.
+Wallet connections require HTTPS — test via GitHub Pages, not a local file.
 Built With
 Vanilla HTML, CSS, JavaScript
-ethers.js v6 — wallet connection and contract interaction
-Remix IDE — contract deployment
-Arc Testnet — EVM-compatible L1 with USDC as gas token
+ethers.js v6
+Remix IDE
+Arc Testnet
 Google Fonts — Space Mono + Syne
-Made by @mfbololadeyy
+Made by @bigvishh
