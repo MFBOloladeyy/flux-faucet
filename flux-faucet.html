@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FLUX Faucet — Free FLUX Tokens on Arc Testnet</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #05050f;
+      --surface: #0d0d1f;
+      --border: rgba(255,255,255,0.07);
+      --accent: #7b61ff;
+      --accent2: #00ffe1;
+      --text: #f0f0f0;
+      --muted: rgba(255,255,255,0.35);
+      --error: #ff4f7b;
+      --success: #00ffe1;
+    }
+    html, body {
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Mono', monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(123,97,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(123,97,255,0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    /* Floating particles */
+    .particles { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+    .particle {
+      position: absolute;
+      width: 3px; height: 3px;
+      border-radius: 50%;
+      background: var(--accent);
+      opacity: 0;
+      animation: float linear infinite;
+    }
+    @keyframes float {
+      0% { transform: translateY(100vh) scale(0); opacity: 0; }
+      10% { opacity: 0.6; }
+      90% { opacity: 0.3; }
+      100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+    }
+
+    .card {
+      position: relative;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 48px 40px;
+      width: 100%;
+      max-width: 500px;
+      text-align: center;
+      box-shadow: 0 0 100px rgba(123,97,255,0.08);
+      z-index: 1;
+    }
+
+    .logo {
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      margin: 0 auto 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Syne', sans-serif;
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: #fff;
+      box-shadow: 0 0 30px rgba(123,97,255,0.4);
+    }
+
+    h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(1.6rem, 5vw, 2.2rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 0.68rem;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 36px;
+    }
+
+    /* Stats row */
+    .stats-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+
+    .stat-box {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .stat-val {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 0.58rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* Drip amount display */
+    .drip-display {
+      background: linear-gradient(135deg, rgba(123,97,255,0.1), rgba(0,255,225,0.05));
+      border: 1px solid rgba(123,97,255,0.2);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .drip-amount {
+      font-family: 'Syne', sans-serif;
+      font-size: 2.8rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 4px;
+    }
+
+    .drip-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* Status */
+    .status {
+      font-size: 0.68rem;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      min-height: 22px;
+      margin-bottom: 20px;
+      transition: color 0.2s;
+    }
+    .status.ok { color: var(--success); }
+    .status.err { color: var(--error); }
+    .status.loading { color: var(--accent); }
+
+    /* Cooldown timer */
+    .cooldown-bar-wrap {
+      background: rgba(255,255,255,0.04);
+      border-radius: 999px;
+      height: 4px;
+      margin-bottom: 24px;
+      overflow: hidden;
+      display: none;
+    }
+    .cooldown-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 999px;
+      transition: width 1s linear;
+    }
+
+    .cooldown-text {
+      font-size: 0.62rem;
+      color: var(--muted);
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    /* Buttons */
+    .btn {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 16px 24px;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      width: 100%;
+      margin-bottom: 10px;
+    }
+
+    .btn-connect {
+      background: linear-gradient(135deg, var(--accent), #5b41ff);
+      color: #fff;
+      font-weight: 700;
+      box-shadow: 0 4px 24px rgba(123,97,255,0.3);
+    }
+    .btn-connect:hover { transform: translateY(-1px); box-shadow: 0 8px 32px rgba(123,97,255,0.4); }
+
+    .btn-claim {
+      background: linear-gradient(135deg, var(--accent2), #00c4b0);
+      color: #000;
+      font-weight: 700;
+      box-shadow: 0 4px 24px rgba(0,255,225,0.2);
+    }
+    .btn-claim:hover { transform: translateY(-1px); box-shadow: 0 8px 32px rgba(0,255,225,0.3); }
+    .btn-claim:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+    /* Info */
+    .info {
+      border-top: 1px solid var(--border);
+      padding-top: 20px;
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.6rem;
+      letter-spacing: 0.08em;
+    }
+
+    .info-key { color: var(--muted); text-transform: uppercase; }
+    .info-val { color: var(--text); font-size: 0.58rem; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .info-val a { color: var(--accent2); text-decoration: none; }
+    .info-val a:hover { text-decoration: underline; }
+
+    /* Tx log */
+    .tx-log { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 14px; text-align: left; max-height: 90px; overflow-y: auto; display: none; }
+    .tx-log::-webkit-scrollbar { width: 4px; }
+    .tx-log::-webkit-scrollbar-thumb { background: #222; }
+    .tx-item { font-size: 0.58rem; color: var(--muted); padding: 3px 0; display: flex; justify-content: space-between; }
+    .tx-item a { color: var(--accent2); text-decoration: none; }
+
+    .spinner { display: inline-block; width: 10px; height: 10px; border: 2px solid rgba(123,97,255,0.2); border-top-color: var(--accent); border-radius: 50%; animation: rotate 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+    @keyframes rotate { to { transform: rotate(360deg); } }
+
+    .badge { display: inline-flex; align-items: center; gap: 6px; font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; margin-bottom: 20px; }
+    .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent2); animation: blink 2s ease-in-out infinite; }
+    @keyframes blink { 0%,100%{opacity:1}50%{opacity:0.2} }
+
+    @media(max-width:480px){ .card{ padding: 32px 20px; } .drip-amount{ font-size: 2rem; } }
+  </style>
+</head>
+<body>
+
+<!-- Floating particles -->
+<div class="particles" id="particles"></div>
+
+<div class="card">
+  <div class="logo">F</div>
+
+  <div class="badge">
+    <div class="badge-dot"></div>
+    Arc Testnet · Live
+  </div>
+
+  <h1>FLUX Faucet</h1>
+  <div class="subtitle">Claim free FLUX tokens every 8 hours</div>
+
+  <div class="stats-row">
+    <div class="stat-box">
+      <div class="stat-val" id="faucet-balance">—</div>
+      <div class="stat-label">Faucet Balance</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="your-balance">—</div>
+      <div class="stat-label">Your Balance</div>
+    </div>
+  </div>
+
+  <div class="drip-display">
+    <div class="drip-amount">100 FLUX</div>
+    <div class="drip-label">Per claim · Every 8 hours</div>
+  </div>
+
+  <div class="status" id="status">Connect your wallet to claim</div>
+
+  <div class="cooldown-bar-wrap" id="cooldown-wrap">
+    <div class="cooldown-bar" id="cooldown-bar" style="width:100%"></div>
+  </div>
+  <div class="cooldown-text" id="cooldown-text"></div>
+
+  <button class="btn btn-connect" id="btn-connect">Connect Wallet</button>
+  <button class="btn btn-claim" id="btn-claim" disabled>Claim 100 FLUX</button>
+
+  <div class="info">
+    <div class="info-row">
+      <span class="info-key">Token</span>
+      <span class="info-val">
+        <a href="https://testnet.arcscan.app/address/0x8E69B3ABfC97a35c8aE963374A92ef5992501C16" target="_blank">FLUX · 0x8E69...1C16</a>
+      </span>
+    </div>
+    <div class="info-row">
+      <span class="info-key">Faucet</span>
+      <span class="info-val">
+        <a href="https://testnet.arcscan.app/address/0xd50Cc3C50f067249a54EE2F0E7185B057e33217A" target="_blank">0xd50C...217A</a>
+      </span>
+    </div>
+    <div class="info-row">
+      <span class="info-key">Wallet</span>
+      <span class="info-val" id="wallet-display">Not connected</span>
+    </div>
+    <div class="info-row">
+      <span class="info-key">Network</span>
+      <span class="info-val">Arc Testnet (5042002)</span>
+    </div>
+  </div>
+
+  <div class="tx-log" id="tx-log"></div>
+</div>
+
+<script>
+  const TOKEN_ADDRESS   = '0x8E69B3ABfC97a35c8aE963374A92ef5992501C16';
+  const FAUCET_ADDRESS  = '0xd50Cc3C50f067249a54EE2F0E7185B057e33217A';
+  const RPC_URL         = 'https://rpc.testnet.arc.network';
+  const EXPLORER        = 'https://testnet.arcscan.app';
+  const CHAIN_ID        = '0x4CDCD2';
+
+  const TOKEN_ABI = [
+    "function balanceOf(address) view returns (uint256)",
+    "function symbol() view returns (string)"
+  ];
+  const FAUCET_ABI = [
+    "function claim() public",
+    "function faucetBalance() view returns (uint256)",
+    "function timeUntilNextClaim(address) view returns (uint256)",
+    "function cooldown() view returns (uint256)"
+  ];
+
+  const $ = id => document.getElementById(id);
+  let provider, signer, faucetContract, tokenContract;
+  let cooldownInterval;
+
+  // Spawn particles
+  const pWrap = $('particles');
+  for (let i = 0; i < 20; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.left = Math.random() * 100 + '%';
+    p.style.animationDuration = (8 + Math.random() * 12) + 's';
+    p.style.animationDelay = (Math.random() * 10) + 's';
+    p.style.width = p.style.height = (2 + Math.random() * 3) + 'px';
+    p.style.background = Math.random() > 0.5 ? '#7b61ff' : '#00ffe1';
+    pWrap.appendChild(p);
+  }
+
+  function setStatus(msg, type='') {
+    $('status').textContent = msg;
+    $('status').className = 'status ' + type;
+  }
+
+  function fmt(wei) {
+    const n = parseFloat(ethers.formatUnits(wei, 18));
+    if (n >= 1000) return (n/1000).toFixed(1) + 'K';
+    return n.toFixed(0);
+  }
+
+  function shortAddr(a) { return a.slice(0,6)+'...'+a.slice(-4); }
+
+  async function readBalances(userAddr) {
+    try {
+      const rp = new ethers.JsonRpcProvider(RPC_URL);
+      const tc = new ethers.Contract(TOKEN_ADDRESS, TOKEN_ABI, rp);
+      const fc = new ethers.Contract(FAUCET_ADDRESS, FAUCET_ABI, rp);
+      const [fb, ub] = await Promise.all([fc.faucetBalance(), userAddr ? tc.balanceOf(userAddr) : 0n]);
+      $('faucet-balance').textContent = fmt(fb) + ' FLUX';
+      $('your-balance').textContent = userAddr ? fmt(ub) + ' FLUX' : '—';
+    } catch(e) { console.error(e); }
+  }
+
+  async function checkCooldown(userAddr) {
+    try {
+      const rp = new ethers.JsonRpcProvider(RPC_URL);
+      const fc = new ethers.Contract(FAUCET_ADDRESS, FAUCET_ABI, rp);
+      const [remaining, total] = await Promise.all([fc.timeUntilNextClaim(userAddr), fc.cooldown()]);
+      const rem = Number(remaining);
+      const tot = Number(total);
+
+      if (rem === 0) {
+        $('btn-claim').disabled = false;
+        $('cooldown-wrap').style.display = 'none';
+        $('cooldown-text').style.display = 'none';
+        setStatus('Ready to claim! Tap the button below.', 'ok');
+        clearInterval(cooldownInterval);
+      } else {
+        $('btn-claim').disabled = true;
+        $('cooldown-wrap').style.display = 'block';
+        $('cooldown-text').style.display = 'block';
+        const pct = ((tot - rem) / tot * 100).toFixed(1);
+        $('cooldown-bar').style.width = pct + '%';
+        const h = Math.floor(rem / 3600);
+        const m = Math.floor((rem % 3600) / 60);
+        const s = rem % 60;
+        $('cooldown-text').textContent = `Next claim in: ${h}h ${m}m ${s}s`;
+        setStatus('Cooldown active. Come back later.', '');
+
+        clearInterval(cooldownInterval);
+        let r = rem;
+        cooldownInterval = setInterval(() => {
+          r--;
+          if (r <= 0) { clearInterval(cooldownInterval); checkCooldown(userAddr); return; }
+          const ph = Math.floor(r/3600), pm = Math.floor((r%3600)/60), ps = r%60;
+          $('cooldown-text').textContent = `Next claim in: ${ph}h ${pm}m ${ps}s`;
+          $('cooldown-bar').style.width = ((tot-r)/tot*100).toFixed(1) + '%';
+        }, 1000);
+      }
+    } catch(e) { console.error(e); }
+  }
+
+  async function connectWallet() {
+    if (!window.ethereum) { setStatus('No wallet detected. Install Rabby or MetaMask.', 'err'); return; }
+    try {
+      setStatus('Connecting...', 'loading');
+      provider = new ethers.BrowserProvider(window.ethereum);
+      await provider.send('eth_requestAccounts', []);
+      try {
+        await provider.send('wallet_switchEthereumChain', [{ chainId: CHAIN_ID }]);
+      } catch(sw) {
+        if (sw.code === 4902) {
+          await provider.send('wallet_addEthereumChain', [{
+            chainId: CHAIN_ID, chainName: 'Arc Testnet',
+            rpcUrls: [RPC_URL],
+            nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
+            blockExplorerUrls: [EXPLORER]
+          }]);
+        }
+      }
+      signer = await provider.getSigner();
+      faucetContract = new ethers.Contract(FAUCET_ADDRESS, FAUCET_ABI, signer);
+      tokenContract  = new ethers.Contract(TOKEN_ADDRESS, TOKEN_ABI, signer);
+
+      const addr = await signer.getAddress();
+      $('wallet-display').textContent = shortAddr(addr);
+      $('btn-connect').textContent = '✓ Connected';
+      $('btn-connect').style.background = 'rgba(123,97,255,0.15)';
+      $('btn-connect').style.color = 'var(--accent)';
+      $('btn-connect').style.boxShadow = 'none';
+
+      await readBalances(addr);
+      await checkCooldown(addr);
+    } catch(e) {
+      setStatus('Connection failed: ' + (e.message || e), 'err');
+    }
+  }
+
+  async function claim() {
+    if (!faucetContract) return;
+    try {
+      $('btn-claim').disabled = true;
+      $('btn-claim').innerHTML = '<span class="spinner"></span>Sending...';
+      setStatus('Waiting for wallet confirmation...', 'loading');
+
+      const tx = await faucetContract.claim();
+      $('btn-claim').innerHTML = '<span class="spinner"></span>Confirming...';
+      setStatus('Transaction sent! Confirming on-chain...', 'loading');
+
+      await tx.wait();
+
+      // Add tx to log
+      $('tx-log').style.display = 'block';
+      const item = document.createElement('div');
+      item.className = 'tx-item';
+      item.innerHTML = `<span>✓ Claimed 100 FLUX</span><a href="${EXPLORER}/tx/${tx.hash}" target="_blank">${tx.hash.slice(0,10)}...↗</a>`;
+      $('tx-log').prepend(item);
+
+      setStatus('✓ 100 FLUX claimed successfully!', 'ok');
+      const addr = await signer.getAddress();
+      await readBalances(addr);
+      await checkCooldown(addr);
+    } catch(e) {
+      if (e.code === 4001 || e.code === 'ACTION_REJECTED') {
+        setStatus('Transaction rejected.', 'err');
+      } else {
+        const msg = e.reason || e.shortMessage || e.message || 'Unknown error';
+        setStatus('Error: ' + msg, 'err');
+      }
+      $('btn-claim').disabled = false;
+      $('btn-claim').textContent = 'Claim 100 FLUX';
+    }
+  }
+
+  $('btn-connect').addEventListener('click', connectWallet);
+  $('btn-claim').addEventListener('click', claim);
+
+  // Read balances on load
+  readBalances(null);
+</script>
+</body>
+</html>
